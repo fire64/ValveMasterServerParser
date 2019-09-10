@@ -1,6 +1,9 @@
 # Prerequisites
 *.d
 *.user
+*.htm
+*.manifest
+*.dep
 
 # Object files
 *.o

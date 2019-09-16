@@ -544,6 +544,9 @@ int main(int argc, char* argv[] )
 
 	pSocket->SetAdr( "hl2master.steampowered.com", 27011 );
 
+	QueryMasterServer( pSocket, "0.0.0.0", 0, 70 );
+
+/*
 	while(true)
 	{
 		//GoldSRC mods
@@ -554,6 +557,7 @@ int main(int argc, char* argv[] )
 		QueryMasterServer( pSocket, "0.0.0.0", 0, 218 );
 		QueryMasterServer( pSocket, "0.0.0.0", 0, 243750 );
 	}
+*/
 
 	//All games
 //	QueryMasterServer( pSocket, "0.0.0.0", 0, 0 );

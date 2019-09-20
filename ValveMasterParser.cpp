@@ -349,7 +349,7 @@ int QueryMasterServer(  Csocket *pSocket, char *pStartServerIP, int port, int Ap
 
 	LogPrintf( false, "Get answer from server: %d bytes\r\n", clrecvsize );
 
-	if( clrecvsize > 6 && pRecvData[0] == '\xFF' && pRecvData[1] == '\xFF' && pRecvData[2] == '\xFF' && pRecvData[3] == '\xFF' && pRecvData[4] == '\x66' && pRecvData[5] == '\x0A' && (clrecvsize - 6) & 6 )
+	if( clrecvsize > 6 && pRecvData[0] == '\xFF' && pRecvData[1] == '\xFF' && pRecvData[2] == '\xFF' && pRecvData[3] == '\xFF' && pRecvData[4] == '\x66' && pRecvData[5] == '\x0A' /*&& (clrecvsize - 6) & 6*/ )
 	{
 		int countaddr = (clrecvsize / 6) - 1;
 
@@ -379,13 +379,36 @@ int QueryMasterServer(  Csocket *pSocket, char *pStartServerIP, int port, int Ap
 	return 1;
 }
 
+// Another user is requesting a challenge value from this machine
+// NOTE: this is currently duplicated in SteamClient.dll but for a different purpose,
+// so these can safely diverge anytime. SteamClient will be using a different protocol
+// to update the master servers anyway.
+#define A2S_GETCHALLENGE		'q'	// Request challenge # from another machine
+
+
+#define A2M_GET_SERVERS_BATCH2	'1' // New style server query
+// Master response with server list for channel
+#define M2A_SERVER_BATCH		'f' // + int32 next uniqueID( -1 for last batch ) + 6 byte IP/Port list.
+
+#define	C2M_CHECKMD5			'M'	// player client asks secure master if Module MD5 is valid
+#define M2C_ISVALIDMD5			'N'	// secure servers answer to C2M_CHECKMD5
+
+// Generic Ping Request
+#define	A2A_PING				'i'	// respond with an A2A_ACK
+
+// Generic Ack
+#define	A2A_ACK					'j'	// general acknowledgement without info
+
 int main(int argc, char* argv[] )
 {
 	LogPrintf(false, "Master server checker...\r\n" );
 
 	Csocket *pSocket = new Csocket(eSocketProtocolUDP);
 
+//	List not oficial master servers: https://hlmaster.info/
 	pSocket->SetAdr( "hl2master.steampowered.com", 27011 );
+
+	pSocket->SetTimeOut( 500000 );
 
 	QueryMasterServer( pSocket, "0.0.0.0", 0, 70 );
 

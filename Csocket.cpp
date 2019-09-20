@@ -8,6 +8,7 @@
 
 #include "StdAfx.h"
 #include "Csocket.h"
+#include "tools.h"
 
 //-----------------------------------------------------------------------------
 // Purpose: Constructor

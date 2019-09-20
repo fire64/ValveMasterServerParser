@@ -201,6 +201,10 @@
 				</FileConfiguration>
 			</File>
 			<File
+				RelativePath=".\Tools.cpp"
+				>
+			</File>
+			<File
 				RelativePath=".\ValveMasterParser.cpp"
 				>
 			</File>
@@ -224,6 +228,10 @@
 			</File>
 			<File
 				RelativePath=".\targetver.h"
+				>
+			</File>
+			<File
+				RelativePath=".\tools.h"
 				>
 			</File>
 		</Filter>

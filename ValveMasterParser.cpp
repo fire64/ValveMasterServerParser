@@ -4,6 +4,7 @@
 #include "stdafx.h"
 #include "Csocket.h"
 #include "DataParser.h"
+#include <process.h>
 
 void GameDataLog( char *fmt, ... )
 {
@@ -196,6 +197,7 @@ int GetServerInfo( char *pServerIP, int port )
 		return 0;
 	}
 
+/*
 	GameDataLog( "ServerID: %d\r\n", serverid);
 	GameDataLog( "Addr: %s:%d\r\n", pServerInfo.pServAddr, pServerInfo.serverport);
 	GameDataLog( "Protocol version: %d\r\n", pServerInfo.protocol);
@@ -298,12 +300,20 @@ int GetServerInfo( char *pServerIP, int port )
 	GameDataLog( "Tags: %s\r\n", pServerInfo.tags);
 	GameDataLog( "GameID: %ld\r\n", pServerInfo.gameid);
 	GameDataLog( "\r\n\r\n" );
+*/
 
-	FILE *fp = fopen( "list.csv", "ab" );
+	while(true)
+	{
+		FILE *fp = fopen( "list.csv", "ab" );
 
-	fprintf( fp, "%d;%s;%d;%d;%s;%s;%s;%s;%d\n", serverid, pServerInfo.pServAddr, pServerInfo.serverport, pServerInfo.protocol, pServerInfo.pHostName, pServerInfo.pMapName, pServerInfo.pGameDir, pServerInfo.pGameName, pServerInfo.appid);
+		if(fp) //while for free file for open ))
+		{
+			fprintf( fp, "%d;%s;%d;%d;%s;%s;%s;%s;%d;%d\n", serverid, pServerInfo.pServAddr, pServerInfo.serverport, pServerInfo.protocol, pServerInfo.pHostName, pServerInfo.pMapName, pServerInfo.pGameDir, pServerInfo.pGameName, pServerInfo.appid, pServerInfo.gameid);
 
-	fclose( fp );
+			fclose( fp );
+			break;
+		}
+	}
 
 //	LogPrintf( false, "ServerID: %d, GameDir: %s, Game Name: %s\n", serverid, pServerInfo.pGameDir, pServerInfo.pGameName );
 
@@ -314,6 +324,25 @@ int GetServerInfo( char *pServerIP, int port )
 	delete pSocket;
 
 	return 1;
+}
+
+int globalServerId = 0;
+
+
+struct threaddata_t
+{
+	int serverid;
+	char pServerIP[512];
+	int port;
+};
+
+void ThreadForGetServerInfo( void* pParams )
+{
+	threaddata_t *pThreadData = (threaddata_t *)pParams;
+
+	GetServerInfo( pThreadData->pServerIP, pThreadData->port );
+
+	free(pThreadData);
 }
 
 int QueryMasterServer(  Csocket *pSocket, char *pStartServerIP, int port, int AppId )
@@ -327,7 +356,7 @@ int QueryMasterServer(  Csocket *pSocket, char *pStartServerIP, int port, int Ap
 	sprintf( pAddrQuery, "%s:%d", pStartServerIP, port);
 	strcat( pQuery, pAddrQuery );
 
-	if(AppId)
+	if(AppId > 0)
 	{
 		char pFilter[1024];
 		memset( pFilter, 0, sizeof(pFilter) );
@@ -362,9 +391,17 @@ int QueryMasterServer(  Csocket *pSocket, char *pStartServerIP, int port, int Ap
 			in_addr in;
 			in.S_un.S_addr = pIpAddrList[i].ip;
 
-			LogPrintf( false, "Server: %s:%d\r\n", inet_ntoa( in ), htons( pIpAddrList[i].port ) );
+			globalServerId++;
 
-			GetServerInfo( inet_ntoa( in ), htons( pIpAddrList[i].port)  );
+			LogPrintf( false, "Server %d: %s:%d\r\n", globalServerId, inet_ntoa( in ), htons( pIpAddrList[i].port ) );
+
+			threaddata_t *pThreadData = new threaddata_t();
+			pThreadData->serverid = globalServerId;
+			strcpy( pThreadData->pServerIP, inet_ntoa( in ) );
+			pThreadData->port = htons( pIpAddrList[i].port);
+
+			_beginthread( ThreadForGetServerInfo, 0, pThreadData );
+//			GetServerInfo( inet_ntoa( in ), htons( pIpAddrList[i].port)  );
 		}
 
 		in_addr in;
@@ -372,8 +409,17 @@ int QueryMasterServer(  Csocket *pSocket, char *pStartServerIP, int port, int Ap
 
 		if( pIpAddrList[countaddr-1].ip != 0 && pIpAddrList[countaddr-1].port != 0 )
 		{
+			Sleep(5000);
 			return QueryMasterServer( pSocket, inet_ntoa( in ), htons( pIpAddrList[countaddr-1].port), AppId );
 		}
+		else
+		{
+			Sleep(1000 * 120);
+		}
+	}
+	else
+	{
+		return QueryMasterServer(  pSocket, pStartServerIP, port, AppId );
 	}
 
 	return 1;
@@ -410,7 +456,7 @@ int main(int argc, char* argv[] )
 
 	pSocket->SetTimeOut( 500000 );
 
-	QueryMasterServer( pSocket, "0.0.0.0", 0, 70 );
+//	QueryMasterServer( pSocket, "0.0.0.0", 0, 70 );
 
 /*
 	while(true)
@@ -424,9 +470,8 @@ int main(int argc, char* argv[] )
 		QueryMasterServer( pSocket, "0.0.0.0", 0, 243750 );
 	}
 */
-
 	//All games
-//	QueryMasterServer( pSocket, "0.0.0.0", 0, 0 );
+	QueryMasterServer( pSocket, "0.0.0.0", 0, 0 );
 
 	delete pSocket;
 

@@ -89,9 +89,10 @@ int GetServerInfo( char *pServerIP, int port )
 	sprintf( pQueryPack, "\xFF\xFF\xFF\xFFTSource Engine Query" );
 	pSocket->Send( (unsigned char *)pQueryPack, strlen(pQueryPack) + 1 );
 
-	unsigned char pRecvBuff2[2048];
+	unsigned char pRecvBuff2[10240];
 	memset(pRecvBuff2, 0, sizeof(pRecvBuff2));
 	int recvbytes = pSocket->Recv(pRecvBuff2, sizeof(pRecvBuff2) );
+	delete pSocket;
 
 	if( pRecvBuff2[0] == 0xFF && pRecvBuff2[1] == 0xFF && pRecvBuff2[2] == 0xFF && pRecvBuff2[3] == 0xFF && pRecvBuff2[4] == 0x49 ) //Current default query
 	{
@@ -190,10 +191,11 @@ int GetServerInfo( char *pServerIP, int port )
 
 		pServerInfo.secure = pDataParser->GetByte();
 		pServerInfo.bots = pDataParser->GetByte();
+
+		delete pDataParser;
 	}
 	else
 	{
-		delete pSocket;
 		return 0;
 	}
 
@@ -315,13 +317,32 @@ int GetServerInfo( char *pServerIP, int port )
 		}
 	}
 
-//	LogPrintf( false, "ServerID: %d, GameDir: %s, Game Name: %s\n", serverid, pServerInfo.pGameDir, pServerInfo.pGameName );
+	char pDirectory[MAX_PATH];
 
-	CreateDirectory( pServerInfo.pGameDir, NULL );
+	if( pServerInfo.gameid > 0 )
+	{
+		sprintf(pDirectory, "%d", pServerInfo.gameid );
+	}
+	else if( pServerInfo.appid > 0 )
+	{
+		sprintf(pDirectory, "%d", pServerInfo.appid );
+	}
+	else
+	{
+		sprintf(pDirectory, "%d", 0 );
+	}
 
+	CreateDirectory( pDirectory, NULL );
+
+	strcat( pDirectory, "/" );
+	strcat( pDirectory, pServerInfo.pGameDir );
+	CreateDirectory( pDirectory, NULL );
+
+	CreateDirectory( pDirectory, NULL );
+	strcat( pDirectory, "/" );
+	strcat( pDirectory, pServerInfo.pMapName );
+	CreateDirectory( pDirectory, NULL );
 	serverid++;
-
-	delete pSocket;
 
 	return 1;
 }
@@ -376,13 +397,13 @@ int QueryMasterServer(  Csocket *pSocket, char *pStartServerIP, int port, int Ap
 
 	int clrecvsize = pSocket->Recv( (unsigned char *)pRecvData, sizeof(pRecvData) );
 
-	LogPrintf( false, "Get answer from server: %d bytes\r\n", clrecvsize );
+	LogPrintf( false, "Get answer from server: %d bytes App: %d\r\n", clrecvsize, AppId );
 
 	if( clrecvsize > 6 && pRecvData[0] == '\xFF' && pRecvData[1] == '\xFF' && pRecvData[2] == '\xFF' && pRecvData[3] == '\xFF' && pRecvData[4] == '\x66' && pRecvData[5] == '\x0A' /*&& (clrecvsize - 6) & 6*/ )
 	{
 		int countaddr = (clrecvsize / 6) - 1;
 
-		LogPrintf( false, "Get corrected answer from: %d servers\r\n", (clrecvsize / 6) - 1 ); 
+		LogPrintf( false, "Get corrected answer from: %d servers App: %d\r\n", (clrecvsize / 6) - 1, AppId ); 
 
 		servadr_t *pIpAddrList = (servadr_t *)(pRecvData + 6);
 
@@ -393,7 +414,7 @@ int QueryMasterServer(  Csocket *pSocket, char *pStartServerIP, int port, int Ap
 
 			globalServerId++;
 
-			LogPrintf( false, "Server %d: %s:%d\r\n", globalServerId, inet_ntoa( in ), htons( pIpAddrList[i].port ) );
+			LogPrintf( false, "Server %d: %s:%d App: %d\r\n", globalServerId, inet_ntoa( in ), htons( pIpAddrList[i].port ), AppId );
 
 			threaddata_t *pThreadData = new threaddata_t();
 			pThreadData->serverid = globalServerId;
@@ -401,7 +422,6 @@ int QueryMasterServer(  Csocket *pSocket, char *pStartServerIP, int port, int Ap
 			pThreadData->port = htons( pIpAddrList[i].port);
 
 			_beginthread( ThreadForGetServerInfo, 0, pThreadData );
-//			GetServerInfo( inet_ntoa( in ), htons( pIpAddrList[i].port)  );
 		}
 
 		in_addr in;
@@ -409,16 +429,25 @@ int QueryMasterServer(  Csocket *pSocket, char *pStartServerIP, int port, int Ap
 
 		if( pIpAddrList[countaddr-1].ip != 0 && pIpAddrList[countaddr-1].port != 0 )
 		{
-			Sleep(5000);
+			Sleep(3000);
 			return QueryMasterServer( pSocket, inet_ntoa( in ), htons( pIpAddrList[countaddr-1].port), AppId );
 		}
 		else
 		{
-			Sleep(1000 * 120);
+			return 1;
 		}
 	}
 	else
 	{
+		delete pSocket;
+		Sleep(5000);
+		pSocket = new Csocket(eSocketProtocolUDP);
+
+		//	List not oficial master servers: https://hlmaster.info/
+		pSocket->SetAdr( "hl2master.steampowered.com", 27011 );
+
+		pSocket->SetTimeOut( 500000 );
+
 		return QueryMasterServer(  pSocket, pStartServerIP, port, AppId );
 	}
 
@@ -447,7 +476,8 @@ int QueryMasterServer(  Csocket *pSocket, char *pStartServerIP, int port, int Ap
 
 int main(int argc, char* argv[] )
 {
-	LogPrintf(false, "Master server checker...\r\n" );
+//	LogPrintf(false, "Master server checker...\r\n" );
+	printf( "Master server checker...\r\n" );
 
 	Csocket *pSocket = new Csocket(eSocketProtocolUDP);
 
@@ -456,7 +486,12 @@ int main(int argc, char* argv[] )
 
 	pSocket->SetTimeOut( 500000 );
 
-//	QueryMasterServer( pSocket, "0.0.0.0", 0, 70 );
+//	for( int i = 731; i < 65000; i++ )
+//	{
+//		QueryMasterServer( pSocket, "0.0.0.0", 0, i );
+//	}
+
+	QueryMasterServer( pSocket, "0.0.0.0", 0, 0 );
 
 /*
 	while(true)
@@ -471,7 +506,7 @@ int main(int argc, char* argv[] )
 	}
 */
 	//All games
-	QueryMasterServer( pSocket, "0.0.0.0", 0, 0 );
+//	QueryMasterServer( pSocket, "0.0.0.0", 0, 0 );
 
 	delete pSocket;
 

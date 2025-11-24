@@ -13,12 +13,15 @@ void GameDataLog( char *fmt, ... )
 
 	va_list marker;
 	va_start( marker, fmt );
-	vsprintf( string + strlen(string), fmt, marker );
+	vsnprintf( string, sizeof(string) - 1, fmt, marker );
 	va_end( marker );
 
 	FILE *fp = fopen( "serverinfo.log", "ab" );
-	fprintf( fp, "%s", string );
-	fclose( fp );
+	if( fp )
+	{
+		fprintf( fp, "%s", string );
+		fclose( fp );
+	}
 }
 
 #pragma pack( push, 1 )
@@ -416,7 +419,8 @@ int QueryMasterServer(  Csocket *pSocket, char *pStartServerIP, int port, int Ap
 
 			LogPrintf( false, "Server %d: %s:%d App: %d\r\n", globalServerId, inet_ntoa( in ), htons( pIpAddrList[i].port ), AppId );
 
-			threaddata_t *pThreadData = new threaddata_t();
+			threaddata_t *pThreadData = (threaddata_t *)malloc(sizeof(threaddata_t));
+			memset(pThreadData, 0, sizeof(threaddata_t));
 			pThreadData->serverid = globalServerId;
 			strcpy( pThreadData->pServerIP, inet_ntoa( in ) );
 			pThreadData->port = htons( pIpAddrList[i].port);

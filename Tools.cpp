@@ -72,11 +72,11 @@ void LogPrintf( bool iserror, char *fmt, ... )
 
 	tm* timeinfo;
 	timeinfo = localtime ( &start );
-	sprintf( string, "%d:%d  ", timeinfo->tm_hour, timeinfo->tm_min );
+	int offset = snprintf( string, sizeof(string), "%d:%d  ", timeinfo->tm_hour, timeinfo->tm_min );
 
 	va_list marker;
 	va_start( marker, fmt );
-	vsprintf( string + strlen(string), fmt, marker );
+	vsnprintf( string + offset, sizeof(string) - offset, fmt, marker );
 	va_end( marker );
 
 #ifdef _WIN32
@@ -109,8 +109,11 @@ void LogPrintf( bool iserror, char *fmt, ... )
 		fp = fopen( "info.log", "ab" );
 	}
 
-	fprintf( fp, "%s", string );
-	fclose( fp );
+	if( fp )
+	{
+		fprintf( fp, "%s", string );
+		fclose( fp );
+	}
 }
 
 char const* Sys_FindArg( char const *pArg, char const *pDefault )
@@ -193,6 +196,16 @@ int FileReWrite( char *filename, filedata_t filebuff )
 	fclose (fp);
 
 	return 1;
+}
+
+void FileFree( filedata_t *filebuff )
+{
+	if( filebuff && filebuff->filebuf )
+	{
+		free( filebuff->filebuf );
+		filebuff->filebuf = NULL;
+		filebuff->filelen = 0;
+	}
 }
 
 //Packet tools

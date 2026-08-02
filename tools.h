@@ -14,6 +14,7 @@ int Sys_FindArgInt( char const *pArg, int defaultVal );
 filedata_t FileRead( char *filename );
 int FileWrite( char *filename, filedata_t filebuff );
 int FileReWrite( char *filename, filedata_t filebuff );
+void FileFree( filedata_t *filebuff );
 
 //Packet decode func
 void COM_Munge( unsigned char *data, int len, int seq );
